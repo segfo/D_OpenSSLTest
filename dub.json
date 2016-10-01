@@ -1,0 +1,24 @@
+{
+	"name": "openssltest",
+	"authors": [
+		"segfo"
+	],
+	"description": "standard lib hash AND OpenSSL linking Test",
+	"copyright": "Copyright © 2016, segfo",
+	"license": "proprietary",
+	"dependencies": {
+		"openssl": "~>1.1.4+1.0.1g"
+	},
+	"sourceFiles-x86_64":[
+		"libs/x64/libcrypto.lib",
+		"libs/x64/libssl.lib"
+	],
+	"sourceFiles-x86":[
+		"libs/x86/libcrypto.lib",
+		"libs/x86/libssl.lib"
+	],
+	"sourceFiles":["Gdi32.lib","user32.lib","ws2_32.lib","crypt32.lib"],
+	"sourcePaths":["source/","source/cryptor/"],
+	"importPaths": ["source/","source/cryptor/"],
+	"dflags-x86":["-m32mscoff"]
+}
