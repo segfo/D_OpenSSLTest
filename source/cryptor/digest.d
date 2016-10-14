@@ -6,7 +6,6 @@ import std.stdio;
 class Hash(T){
     WrapperDigest!T digest;
     ubyte[] hash;
-    immutable size_t DEFAULT_CHUNKS=1024;
     this(){
         digest = new WrapperDigest!T();
     }
@@ -25,9 +24,6 @@ class Hash(T){
         if(!file.isOpen){
             throw new FileException("file not opened.");
         }
-        if(chunkSize == 0){
-            chunkSize = DEFAULT_CHUNKS;
-        }
         chunkSize *= 0x1000;
         foreach(chunk;file.byChunk(chunkSize)){
             digest.put(chunk);
@@ -36,9 +32,9 @@ class Hash(T){
         file.seek(0);
         return this;
     }
-    
+    // 1024 chunk = 4MB
     Hash getHash(File file){
-        getHash(file,DEFAULT_CHUNKS);
+        getHash(file,1024);
         return this;
     }
     string hexDigest(){
