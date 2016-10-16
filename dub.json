@@ -10,12 +10,12 @@
 		"openssl": "~>1.1.4+1.0.1g"
 	},
 	"sourceFiles-x86_64":[
-		"libs/x64/libcrypto.lib",
-		"libs/x64/libssl.lib"
+		"libs/x64/libeay32.lib",
+		"libs/x64/ssleay32.lib"
 	],
 	"sourceFiles-x86":[
-		"libs/x86/libcrypto.lib",
-		"libs/x86/libssl.lib"
+		"libs/x86/libeay32.lib",
+		"libs/x86/ssleay32.lib"
 	],
 	"sourceFiles":["Gdi32.lib","user32.lib","ws2_32.lib","crypt32.lib"],
 	"sourcePaths":["source/","source/cryptor/"],

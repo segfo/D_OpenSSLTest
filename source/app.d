@@ -12,17 +12,19 @@ void main()
     
     scope(exit){f.close();}
     {
-        ubyte[] data = cast(ubyte[])"AAAABBBBCCCCDDDDF";
-
-        scope IAES_CBC_Cryptor aes=new AES256_CBC();
+        ubyte[] data = cast(ubyte[])"AAAABBBBCCCCDDDDFF";
+        scope IAES_CBC_Cryptor aes=new AES256_CBC(data.length);
         aes.beginEncrypt(cast(ubyte[])"key");
+        dump(data[0..4]~data[4..data.length]);
         auto z = aes.putEncrypt(data[0..4]);
-        z ~= aes.putEncrypt(data[4..data.length]);
+        z ~= aes.putEncrypt(data[4..data.length]).dup();
         z ~= aes.endEncrypt();
+        dump(z);
 
         aes.beginDecrypt(aes.getIV(),cast(ubyte[])"key");
-        z = aes.putDecrypt(z);
+        z = aes.putDecrypt(z).dup();
         z ~= aes.endDecrypt();
+        dump(z);
     }
     writeln("shutdown.");
 }

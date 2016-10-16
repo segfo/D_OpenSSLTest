@@ -1,4 +1,5 @@
 module cryptor.AES;
+import core.exception;
 import std.stdio;
 import deimos.openssl.evp;
 import cryptor.Random;
@@ -7,10 +8,8 @@ import cryptor.Digest;
 import std.digest.sha;
 import util.Util;
 
-// 暗号化するクラスは、スコープを抜けると必ずデストラクタを呼ぶようにする
-// これはCreanup関数を必ず呼ぶため
-// また、実際に暗号化をする際はこのクラスのラッパーを呼ぶ。
-// 直接使うのは面倒なので非推奨
+// 実際に暗号化をする際はこのクラスのラッパーを呼ぶ。
+// このインタフェースを直接使うのは面倒なので非推奨
 
 // AES-CBCモード用インタフェース
 interface IAES_CBC_Cryptor{
@@ -35,7 +34,6 @@ interface IAES_CBC_Cryptor{
     size_t  getBlockSize();
     ubyte[] getIV();
 }
-extern(C){int EVP_CIPHER_CTX_reset(EVP_CIPHER_CTX* ctx);}
 
 // AES-CBCモードで暗号化する。
 // 鍵長はサブクラスから指定する。
@@ -52,12 +50,21 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
     private ubyte[] buffer;
 
     this(const EVP_CIPHER* mode){
-        this.KeyLength = KeyLength;
         this.mode = mode;
         this.digest = new Hash!T();
         this.BlockSize = EVP_CIPHER_block_size(mode);
-        this.buffer = new ubyte[BlockSize];
         this.KeyLength = EVP_CIPHER_key_length(mode);
+    }
+    this(const EVP_CIPHER* mode ,ubyte[] internalBuffer){
+        this(mode);
+        this.buffer = internalBuffer;
+    }
+
+    this(const EVP_CIPHER* mode,size_t internalBufferSize){
+        this(mode);
+        // 繰り上げ
+        internalBufferSize = (BlockSize*((internalBufferSize+BlockSize-1) / BlockSize));
+        this.buffer = new ubyte[internalBufferSize];
     }
 
     size_t  getBlockSize(){
@@ -68,7 +75,7 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
     }
     // OpenSSLのリソース解放メソッド
     private void resourcesDespose(){
-        EVP_CIPHER_CTX_reset(&ctx);
+        EVP_CIPHER_CTX_cleanup(&ctx);
     }
     /////////////////////////////////////
     // 暗号化用インタフェース
@@ -76,7 +83,7 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
     // IV自動生成(ブロックサイズが違う可能性があるため、子クラスに任せる)
     // ※OpenSSLは16バイトのはずだが念のため
     void    beginEncrypt(ubyte[] key){
-        EVP_CIPHER_CTX_reset(&ctx);
+        EVP_CIPHER_CTX_init(&ctx);
         this.iv = new ubyte[BlockSize];
         getRandom(iv);
         ubyte[] keyHash = digest.getHash(key).rawDigest();
@@ -93,6 +100,9 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
         int cipherLen;
         scope(failure){
             resourcesDespose();
+        }
+        if( data.length > this.buffer.length ){
+            throw new RangeError("internal buffer out of range.");
         }
         int status = EVP_EncryptUpdate(&ctx, this.buffer.ptr, &cipherLen, data.ptr, cast(int)data.length);
         if(status == OPENSSL_CALL_FAILURE){
@@ -117,7 +127,7 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
     // 復号用インタフェース
     /////////////////////////////////////
     void    beginDecrypt(ubyte[] iv,ubyte[] key){
-        EVP_CIPHER_CTX_reset(&ctx);
+        EVP_CIPHER_CTX_init(&ctx);
         this.iv = iv;
         ubyte[] keyHash = digest.getHash(key).rawDigest();
         if(keyHash.length<(KeyLength)){
@@ -133,6 +143,9 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
         int plainLen;
         scope(failure){
             resourcesDespose();
+        }
+        if( data.length > this.buffer.length ){
+            throw new RangeError("internal buffer out of range.");
         }
         int status = EVP_DecryptUpdate(&ctx, this.buffer.ptr,&plainLen, data.ptr, cast(int)data.length);
         if(status == OPENSSL_CALL_FAILURE){
@@ -157,20 +170,32 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
 scope class AES256_CBC:AES_CBC_Cryptor!SHA256
 {
     this(){
-        super(EVP_aes_256_cbc());
+        this(4096);
+    }
+    this(ubyte[] internalBuffer){
+        super(EVP_aes_256_cbc(),internalBuffer);
+    }
+    this(size_t internalBufferSize){
+        super(EVP_aes_256_cbc(),internalBufferSize);
     }
 }
 
 scope class AES192_CBC:AES_CBC_Cryptor!SHA224
 {
     this(){
-        super(EVP_aes_192_cbc());
+        this(4096);
+    }
+    this(size_t internalBufferSize){
+        super(EVP_aes_192_cbc(),internalBufferSize);
     }
 }
 
 scope class AES128_CBC:AES_CBC_Cryptor!SHA224
 {
     this(){
-        super(EVP_aes_128_cbc());
+        this(4096);
+    }
+    this(size_t internalBufferSize){
+        super(EVP_aes_128_cbc(),internalBufferSize);
     }
 }
