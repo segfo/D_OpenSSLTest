@@ -55,15 +55,11 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
         this.BlockSize = EVP_CIPHER_block_size(mode);
         this.KeyLength = EVP_CIPHER_key_length(mode);
     }
-    this(const EVP_CIPHER* mode ,ubyte[] internalBuffer){
-        this(mode);
-        this.buffer = internalBuffer;
-    }
 
     this(const EVP_CIPHER* mode,size_t internalBufferSize){
         this(mode);
         // 繰り上げ
-        internalBufferSize = (BlockSize*((internalBufferSize+BlockSize-1) / BlockSize));
+        internalBufferSize = (BlockSize*((internalBufferSize+BlockSize) / BlockSize));
         this.buffer = new ubyte[internalBufferSize];
     }
 
@@ -138,7 +134,6 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
         EVP_DecryptInit_ex(&ctx, mode, null, keyHash.ptr,iv.ptr);
     }
     
-    // データがブロック長の整数倍の長さでない場合はエラー
     ubyte[]  putDecrypt(ubyte[] data){
         int plainLen;
         scope(failure){
@@ -171,9 +166,6 @@ scope class AES256_CBC:AES_CBC_Cryptor!SHA256
 {
     this(){
         this(4096);
-    }
-    this(ubyte[] internalBuffer){
-        super(EVP_aes_256_cbc(),internalBuffer);
     }
     this(size_t internalBufferSize){
         super(EVP_aes_256_cbc(),internalBufferSize);
