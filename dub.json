@@ -18,7 +18,7 @@
 		"libs/x86/ssleay32.lib"
 	],
 	"sourceFiles":["Gdi32.lib","user32.lib","ws2_32.lib","crypt32.lib"],
-	"sourcePaths":["source/","source/cryptor/"],
-	"importPaths": ["source/","source/cryptor/"],
+	"sourcePaths":["source/","source/cryptor/","source/util/"],
+	"importPaths": ["source/","source/cryptor/","source/util/"],
 	"dflags-x86":["-m32mscoff"]
 }

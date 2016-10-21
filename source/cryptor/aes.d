@@ -12,13 +12,12 @@ import util.Util;
 // このインタフェースを直接使うのは面倒なので非推奨
 
 // AES-CBCモード用インタフェース
-interface IAES_CBC_Cryptor{
+interface IAES_CBC_CipherBase{
     /////////////////////////////////////
     // 暗号化用インタフェース
     /////////////////////////////////////
     // IV自動生成
     void    beginEncrypt(ubyte[] key);
-    // データがブロック長の整数倍の長さでない場合はエラー
     ubyte[]  putEncrypt(ubyte[] data);
     // データがブロック長の整数倍の長さでない場合はパディングされる
     ubyte[]  endEncrypt();
@@ -27,17 +26,17 @@ interface IAES_CBC_Cryptor{
     /////////////////////////////////////
     // IVは必ず要求
     void    beginDecrypt(ubyte[] iv,ubyte[] key);
-    // データがブロック長の整数倍の長さでない場合はエラー
     ubyte[]  putDecrypt(ubyte[] data);
     // データがブロック長の整数倍の長さでない場合はパディングされる
     ubyte[]  endDecrypt();
     size_t  getBlockSize();
     ubyte[] getIV();
+    size_t getChunkSize();
 }
 
 // AES-CBCモードで暗号化する。
 // 鍵長はサブクラスから指定する。
-protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Cryptor
+protected abstract class AES_CBC_CipherBase(T) if(isDigest!T):IAES_CBC_CipherBase
 {
     private immutable int OPENSSL_CALL_SUCCESS=1;
     private immutable int OPENSSL_CALL_FAILURE=0;
@@ -58,17 +57,24 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
 
     this(const EVP_CIPHER* mode,size_t internalBufferSize){
         this(mode);
-        // 繰り上げ
-        internalBufferSize = (BlockSize*((internalBufferSize+BlockSize) / BlockSize));
+        if( internalBufferSize == 0 ){
+            internalBufferSize = BlockSize;
+        }
         this.buffer = new ubyte[internalBufferSize];
+    }
+
+    size_t getChunkSize(){
+        return buffer.length;
     }
 
     size_t  getBlockSize(){
         return  BlockSize;
     }
+
     ubyte[] getIV(){
         return iv;
     }
+
     // OpenSSLのリソース解放メソッド
     private void resourcesDespose(){
         EVP_CIPHER_CTX_cleanup(&ctx);
@@ -91,7 +97,6 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
         EVP_EncryptInit_ex(&ctx, mode, null, keyHash.ptr,iv.ptr);
     }
     
-    // データがブロック長の整数倍の長さでない場合はエラー
     ubyte[]  putEncrypt(ubyte[] data){
         int cipherLen;
         scope(failure){
@@ -106,6 +111,7 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
         }
         return this.buffer[0..cipherLen];
     }
+
     // データがブロック長の整数倍の長さでない場合はパディングされる
     ubyte[]  endEncrypt(){
         int cipherLen;
@@ -148,6 +154,7 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
         }
         return this.buffer[0..plainLen];
     }
+
     // データがブロック長の整数倍の長さでない場合はパディングされる
     ubyte[]  endDecrypt(){
         int plainLen;
@@ -162,7 +169,7 @@ protected abstract scope class AES_CBC_Cryptor(T) if(isDigest!T):IAES_CBC_Crypto
     }
 }
 
-scope class AES256_CBC:AES_CBC_Cryptor!SHA256
+class AES256_CBC:AES_CBC_CipherBase!SHA256
 {
     this(){
         this(4096);
@@ -172,7 +179,7 @@ scope class AES256_CBC:AES_CBC_Cryptor!SHA256
     }
 }
 
-scope class AES192_CBC:AES_CBC_Cryptor!SHA224
+class AES192_CBC:AES_CBC_CipherBase!SHA224
 {
     this(){
         this(4096);
@@ -182,7 +189,7 @@ scope class AES192_CBC:AES_CBC_Cryptor!SHA224
     }
 }
 
-scope class AES128_CBC:AES_CBC_Cryptor!SHA224
+class AES128_CBC:AES_CBC_CipherBase!SHA224
 {
     this(){
         this(4096);
