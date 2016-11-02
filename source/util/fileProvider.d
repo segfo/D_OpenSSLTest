@@ -10,18 +10,24 @@ class FileProviderException:Exception{
     }
 }
 
+T readStruct(T)(FileProvider fp){
+    return (cast(T[])fp.read(new T[1]))[0];
+}
+
 interface FileProvider{
     enum SeekMethod{
         SEEK_BEGIN=FILE_BEGIN,SEEK_CURRENT=FILE_CURRENT,SEEK_END=FILE_END
     }
-    void write(const void[] v);
-    void[] read(void[] buf);
+    void setLength(ulong len);
+    void write(const void[] v,size_t* writeSize=null);
+    void[] read(void[] buf,size_t* readSize=null);
     void seek(long pos,SeekMethod moveMethod=SeekMethod.SEEK_BEGIN);
     void pushSeek(long pos,SeekMethod moveMethod=SeekMethod.SEEK_BEGIN);
     void popSeek();
     void seekEnd();
     ulong size();
     ulong getCurrentPosition();
+    bool isEof();
 }
 
 class FileProviderWindows:FileProvider{
@@ -40,7 +46,8 @@ class FileProviderWindows:FileProvider{
         }
         fh = CreateFileW(toUTF16z(path),GENERIC_WRITE|GENERIC_READ,
             FILE_SHARE_READ,NULL,
-            OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,
+            OPEN_ALWAYS,
+            FILE_ATTRIBUTE_NORMAL,
             null);
         if(fh == NULL){
             throw new FileProviderException("CreateFileW Failure");
@@ -61,32 +68,50 @@ class FileProviderWindows:FileProvider{
             CloseHandle(fh);
         }
     }
-    void write(const void[] v){
+
+    void setLength(ulong len){
+        seek(len);
+        SetEndOfFile( fh );
+    }
+
+    void write(const void[] v,size_t* writtedSize = null){
         uint writted;
         ulong writeSize = v.length;
         int status = WriteFile(fh,v.ptr,cast(uint)writeSize,&writted,null);
-        if(status == 0){
+        if( status == 0 || writeSize > writted ){
             throw new FileProviderException("WriteFile Failure.");
         }
+        if( writtedSize != null ){
+            *writtedSize = writted;
+        }
     }
-    void[] read(void[] buf){
+
+    void[] read(void[] buf,size_t* readedSize = null){
         uint readed;
         ulong readSize = buf.length;
         auto currentPos = getCurrentPosition();
         auto status = ReadFile(fh,buf.ptr,cast(uint)readSize,&readed,null);
-        if( status == 0 || readSize > readed ){
+        if( status == 0 || (readSize > readed && readedSize == null)){
             seek(currentPos);
             throw new FileProviderException("ReadFile Failure.");
+        }
+        if( readedSize != null ){
+            *readedSize = readed;
         }
         return buf;
     }
     
-    void seek(long pos,FileProvider.SeekMethod moveMethod=SeekMethod.SEEK_CURRENT){
+    void seek(long pos,FileProvider.SeekMethod moveMethod=SeekMethod.SEEK_BEGIN){
         int fptrH = cast(int)(pos>>32);
         int fptrL = cast(int)pos;
-        SetFilePointer(fh,fptrL,&fptrH,cast(uint)moveMethod);
+        DWORD errorNo = SetFilePointer(fh,fptrL,&fptrH,cast(uint)moveMethod);
+        if(errorNo == INVALID_SET_FILE_POINTER){
+            if( GetLastError() != NO_ERROR ){
+                throw new FileProviderException("SetFilePointer fail.");
+            }
+        }
     }
-    void pushSeek(long pos,SeekMethod moveMethod=SeekMethod.SEEK_CURRENT){
+    void pushSeek(long pos,SeekMethod moveMethod=SeekMethod.SEEK_BEGIN){
         seekerStack.push(getCurrentPosition());
         seek(pos,moveMethod);
     }
@@ -94,7 +119,7 @@ class FileProviderWindows:FileProvider{
         seek(seekerStack.pop(),SeekMethod.SEEK_BEGIN);
     }
     void seekEnd(){
-        SetFilePointer(fh,0,null,cast(uint)SeekMethod.SEEK_END);
+        seek(0,SeekMethod.SEEK_END);
     }
     ulong size(){
         ulong high;
@@ -121,5 +146,16 @@ class FileProviderWindows:FileProvider{
             }
         }
         return ret;
+    }
+    bool isEof(){
+        uint readed;
+        auto currentPos = getCurrentPosition();
+        ubyte buf;
+        auto status = ReadFile(fh,&buf,1,&readed,null);
+        seek(currentPos);
+        if( status == 1 && readed == 0 ){
+            return true;
+        }
+        return false;
     }
 }
