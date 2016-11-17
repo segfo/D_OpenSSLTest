@@ -67,7 +67,7 @@ protected abstract class AES_CBC_CipherBase:IAES_CBC_CipherBase
         this.buffer = new ubyte[internalBufferSize];
         this.hashIterationCount = hashIterationCount;
     }
-
+    // 内部バッファのサイズを返す
     size_t getChunkSize(){
         return buffer.length;
     }
@@ -124,7 +124,10 @@ protected abstract class AES_CBC_CipherBase:IAES_CBC_CipherBase
         EVP_BytesToKey(mode,digest,salt.ptr,
             keyByte.ptr,keyByte.length,
             cast(uint)hashIterationCount,key.ptr,iv.ptr);
-        EVP_EncryptInit_ex(&ctx, mode, null, key.ptr,iv.ptr);
+        int status = EVP_EncryptInit_ex(&ctx, mode, null, key.ptr,iv.ptr);
+        if(status == OPENSSL_CALL_FAILURE){
+            throw new CryptorException("EVP_EncryptInit_ex fail.");
+        }
     }
     
     ubyte[]  putEncrypt(ubyte[] data){
@@ -165,7 +168,10 @@ protected abstract class AES_CBC_CipherBase:IAES_CBC_CipherBase
         EVP_BytesToKey(mode,digest,salt.ptr,
             keyByte.ptr,keyByte.length,
             cast(uint)hashIterationCount,key.ptr,iv.ptr);
-        EVP_DecryptInit_ex(&ctx, mode, null, key.ptr,iv.ptr);
+        int status = EVP_DecryptInit_ex(&ctx, mode, null, key.ptr,iv.ptr);
+        if(status == OPENSSL_CALL_FAILURE){
+            throw new CryptorException("EVP_EncryptInit_ex fail.");
+        }
     }
     
     ubyte[]  putDecrypt(ubyte[] data){
